@@ -63,9 +63,27 @@ type Query {
 }
 
 type Mutation{
-  createUser(name:String!,email:String!,age:Int):User!
-  createPost(title:String!,body:String!,published:Boolean!,author:ID!):Post!
-  createComment(text:String!,author:ID!,post:ID!):Comment!
+  createUser(data:CreateUserInput!):User!
+  createPost(data:CreatePostInput!):Post!
+  createComment(data:CreateCommentInput!):Comment!
+}
+
+input CreateUserInput{
+  name:String!
+  email:String!
+  age:Int
+}
+input CreatePostInput{
+  title:String!
+  body:String!
+  published:Boolean!
+  author:ID!
+}
+
+input CreateCommentInput{
+  text:String!
+  author:ID!
+  post:ID!
 }
 
 type User{
@@ -146,9 +164,10 @@ const resolvers = {
   },
   ///>>>>>>>>   Mutations >>>>>>>>>>>>>>>>>>>>>>
   Mutation: {
+    //because we use Input Type instead of args.email args.data.email
     createUser(parent, args, ctx, info) {
       const emailTaken = users.some(user => {
-        return user.email === args.email;
+        return user.email === args.data.email;
       });
       if (emailTaken) {
         throw new Error("Email already taken");
@@ -156,9 +175,7 @@ const resolvers = {
       //create new user
       const user = {
         id: uuid4(),
-        name: args.name,
-        email: args.email,
-        age: args.age
+       ...args.data
       };
       //save new user
       users.push(user);
@@ -168,7 +185,7 @@ const resolvers = {
 
     createPost(parent, args, ctx, info) {
       const authorIdIsValid = users.some(user => {
-        return user.id === args.author;
+        return user.id === args.data.author;
       });
       if (!authorIdIsValid) {
         throw new Error("Author id is not valid");
@@ -176,10 +193,7 @@ const resolvers = {
       //create
       const post = {
         id: uuid4(),
-        title: args.title,
-        body: args.body,
-        published: args.published,
-        author: args.author
+        ...args.data
       };
       //save
       posts.push(post);
@@ -188,21 +202,20 @@ const resolvers = {
     },
 
     createComment(parent, args, ctx, info) {
-      const postIsValid = posts.some(post => post.id === args.post&&post.published);
+      const postIsValid = posts.some(post => post.id === args.data.post&&post.published);
       if (!postIsValid) {
         throw new Error("Invalid post");
       }
 
-      const authorIdIsValid = users.some(user => user.id === args.author);
+    
+      const authorIdIsValid = users.some(user => user.id === args.data.author);
       if (!authorIdIsValid) {
         throw new Error("Author is not valid");
       }
-      
+
       const comment = {
         id: uuid4(),
-        text: args.text,
-        author: args.author,
-        post: args.post
+        ...args.data
       };
       comments.push(comment);
       return comment;
