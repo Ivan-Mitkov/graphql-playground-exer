@@ -66,7 +66,9 @@ type Mutation{
   createUser(data:CreateUserInput!):User!
   deleteUser(id:ID!):User!
   createPost(data:CreatePostInput!):Post!
+  deletePost(id:ID):Post!
   createComment(data:CreateCommentInput!):Comment!
+  deleteComment(id:ID!):Comment!
 }
 
 input CreateUserInput{
@@ -207,7 +209,7 @@ const resolvers = {
         return !match;
       });
       //iztrivame negovi komentai ot chugdi postove no bez da pipame postovete
-      comments=comments.filter((comment)=>comment.author!==args.id);
+      comments = comments.filter(comment => comment.author !== args.id);
 
       return deletedUser[0];
     },
@@ -229,6 +231,19 @@ const resolvers = {
       return post;
     },
 
+    deletePost(parent, args, ctx, info) {
+      const postIndex = posts.findIndex(post => {
+        return post.id === args.id;
+      });
+      if (postIndex === -1) {
+        throw new Error("Post not found");
+      }
+      const deletedPost = posts.splice(postIndex, 1);
+      //tarsim v negovite comentari
+      comments = comments.filter(comment => comment.post !== args.id);
+      return deletedPost[0];
+    },
+
     createComment(parent, args, ctx, info) {
       const postIsValid = posts.some(
         post => post.id === args.data.post && post.published
@@ -248,6 +263,18 @@ const resolvers = {
       };
       comments.push(comment);
       return comment;
+    },
+
+    deleteComment(parent, args, ctx, info) {
+      const commentIndex = comments.findIndex(
+        comment => comment.id === args.id
+      );
+      if (commentIndex === -1) {
+        throw new Error("Comment not found");
+      }
+      const deletedComment = comments.splice(commentIndex, 1);
+    
+      return deletedComment[0];
     }
   },
 
