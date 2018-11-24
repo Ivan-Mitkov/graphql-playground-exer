@@ -1,53 +1,7 @@
 import { GraphQLServer } from "graphql-yoga";
 import uuid4 from "uuid/v4";
 
-//Demo User data
-let users = [
-  { id: "12fgh", name: "Sylvia", email: "s@s.com", age: 23 },
-  { id: "12h", name: "Saint", email: "s@si.com", age: 27 },
-  { id: "12dfh", name: "Merulin", email: "ds@si.com" }
-];
-let posts = [
-  {
-    id: "12fgh",
-    title: "Sylvia",
-    body: "is good looking woman",
-    published: true,
-    author: "12fgh"
-  },
-  {
-    id: "12h",
-    title: "Rog",
-    body: "WTF is this",
-    published: false,
-    author: "12h"
-  },
-  {
-    id: "fgh",
-    title: "Mondo",
-    body: "L'ombeliko del mondo ",
-    published: true,
-    author: "12dfh"
-  },
-  {
-    id: "ds",
-    title: "Strah",
-    body: "Mechka strah men ne strah ",
-    published: true,
-    author: "12h"
-  }
-];
-let comments = [
-  { id: "jkk", text: "Boko", author: "12fgh", post: "12fgh" },
-  { id: "jhjhkh", text: "Return to the basics", author: "12h", post: "ds" },
-  {
-    id: "fgfghf",
-    text: "Kilimandjaro e v Tanzania",
-    author: "12h",
-    post: "12fgh"
-  },
-  { id: "tgjs", text: "Golemi gluposti", author: "12h", post: "fgh" }
-];
+import db from './db';
 
 //>>>>>>>>        Type definitions (schema) >>>>>>>>>>>>>>>>>>>>>>
 
@@ -57,18 +11,18 @@ const resolvers = {
     users(parents, args, ctx, info) {
       //from Schema args for filtering are provided
       if (!args.query) {
-        return users;
+        return ctx.db.users;
       }
-      return users.filter(user => {
+      return ctx.db.users.filter(user => {
         const name = user.name.toLocaleLowerCase();
         return name.indexOf(args.query.toLocaleLowerCase()) != -1;
       });
     },
     posts(parents, args, ctx, info) {
       if (!args.query) {
-        return posts;
+        return ctx.db.posts;
       }
-      return posts.filter(post => {
+      return ctx.db.posts.filter(post => {
         return (
           post.body
             .toLocaleLowerCase()
@@ -81,9 +35,9 @@ const resolvers = {
     },
     comments(parent, args, ctx, info) {
       if (!args.query) {
-        return comments;
+        return ctx.db.comments;
       }
-      return comments.filter(comment => {
+      return ctx.db.comments.filter(comment => {
         return comment.author.includes(args.query);
       });
     },
@@ -105,7 +59,7 @@ const resolvers = {
   Mutation: {
     //because we use Input Type instead of args.email args.data.email
     createUser(parent, args, ctx, info) {
-      const emailTaken = users.some(user => {
+      const emailTaken = ctx.db.users.some(user => {
         return user.email === args.data.email;
       });
       if (emailTaken) {
@@ -117,7 +71,7 @@ const resolvers = {
         ...args.data
       };
       //save new user
-      users.push(user);
+      ctx.db.users.push(user);
       //return user
       return user;
     },
@@ -125,32 +79,32 @@ const resolvers = {
     //TOVA E MALKO PO SLOGNO
     deleteUser(parent, args, ctx, info) {
       //find index of what we want to delete
-      const userIndex = users.findIndex(user => user.id === args.id);
+      const userIndex = ctx.db.users.findIndex(user => user.id === args.id);
       if (userIndex === -1) {
         throw new Error("Not such user");
       }
-      const deletedUser = users.splice(userIndex, 1);
+      const deletedUser = ctx.db.users.splice(userIndex, 1);
 
       //tarsim v negovite postove
-      posts = posts.filter(currPost => {
+      ctx.db.posts = ctx.db.posts.filter(currPost => {
         //tarsim dali ima post chiito avtor e s args.id
         const match = currPost.author === args.id;
         //ako ima takav post
         if (match) {
           //filtrirame comentarite kato iztrivame vsicki komentari v tozi post
           // vse edno dali negovi ili chugdi
-          comments = comments.filter(comment => comment.post !== currPost.id);
+          ctx.db.comments = ctx.db.comments.filter(comment => comment.post !== currPost.id);
         }
         //vrashtame samo chugdite postove
         return !match;
       });
       //iztrivame negovi komentai ot chugdi postove no bez da pipame postovete
-      comments = comments.filter(comment => comment.author !== args.id);
+      ctx.db.comments = ctx.db.comments.filter(comment => comment.author !== args.id);
 
       return deletedUser[0];
     },
     createPost(parent, args, ctx, info) {
-      const authorIdIsValid = users.some(user => {
+      const authorIdIsValid = ctx.db.users.some(user => {
         return user.id === args.data.author;
       });
       if (!authorIdIsValid) {
@@ -162,33 +116,33 @@ const resolvers = {
         ...args.data
       };
       //save
-      posts.push(post);
+      ctx.db.posts.push(post);
       //return
       return post;
     },
 
     deletePost(parent, args, ctx, info) {
-      const postIndex = posts.findIndex(post => {
+      const postIndex = ctx.db.posts.findIndex(post => {
         return post.id === args.id;
       });
       if (postIndex === -1) {
         throw new Error("Post not found");
       }
-      const deletedPost = posts.splice(postIndex, 1);
+      const deletedPost = ctx.db.posts.splice(postIndex, 1);
       //tarsim v negovite comentari
-      comments = comments.filter(comment => comment.post !== args.id);
+      ctx.db.comments = ctx.db.comments.filter(comment => comment.post !== args.id);
       return deletedPost[0];
     },
 
     createComment(parent, args, ctx, info) {
-      const postIsValid = posts.some(
+      const postIsValid = ctx.db.posts.some(
         post => post.id === args.data.post && post.published
       );
       if (!postIsValid) {
         throw new Error("Invalid post");
       }
 
-      const authorIdIsValid = users.some(user => user.id === args.data.author);
+      const authorIdIsValid = ctx.db.users.some(user => user.id === args.data.author);
       if (!authorIdIsValid) {
         throw new Error("Author is not valid");
       }
@@ -197,18 +151,18 @@ const resolvers = {
         id: uuid4(),
         ...args.data
       };
-      comments.push(comment);
+      ctx.db.comments.push(comment);
       return comment;
     },
 
     deleteComment(parent, args, ctx, info) {
-      const commentIndex = comments.findIndex(
+      const commentIndex = ctx.db.comments.findIndex(
         comment => comment.id === args.id
       );
       if (commentIndex === -1) {
         throw new Error("Comment not found");
       }
-      const deletedComment = comments.splice(commentIndex, 1);
+      const deletedComment = ctx.db.comments.splice(commentIndex, 1);
     
       return deletedComment[0];
     }
@@ -217,36 +171,36 @@ const resolvers = {
   //>>>>>>>>>>>>>>>>  Relation   >>>>>>>>>>>>>>>
   Post: {
     author(parent, args, ctx, info) {
-      return users.find(user => {
+      return ctx.db.users.find(user => {
         return user.id === parent.author;
       });
     },
     comments(parent, args, ctx, info) {
-      return comments.filter(comment => {
+      return ctx.db.comments.filter(comment => {
         return comment.post === parent.id;
       });
     }
   },
   User: {
     posts(parent, args, ctx, info) {
-      return posts.filter(post => {
+      return ctx.db.posts.filter(post => {
         return post.author === parent.id;
       });
     },
     comments(parent, args, ctx, info) {
-      return comments.filter(comment => {
+      return ctx.db.comments.filter(comment => {
         return comment.author === parent.id;
       });
     }
   },
   Comment: {
     author(parent, args, ctx, info) {
-      return users.find(user => {
+      return ctx.db.users.find(user => {
         return user.id === parent.author;
       });
     },
     post(parent, args, ctx, info) {
-      return posts.find(post => {
+      return ctx.db.posts.find(post => {
         return post.id === parent.post;
       });
     }
@@ -256,9 +210,13 @@ const resolvers = {
 };
 
 //because schema.graphql typeDefs:'path from ROOT
+//pass db using context
 const server = new GraphQLServer({
   typeDefs: './src/schema.graphql',
-  resolvers: resolvers
+  resolvers: resolvers,
+  context:{
+    db:db
+  }
 });
 
 const options = {
