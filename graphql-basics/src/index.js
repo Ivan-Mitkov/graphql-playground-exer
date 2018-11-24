@@ -2,12 +2,12 @@ import { GraphQLServer } from "graphql-yoga";
 import uuid4 from "uuid/v4";
 
 //Demo User data
-const users = [
+let users = [
   { id: "12fgh", name: "Sylvia", email: "s@s.com", age: 23 },
   { id: "12h", name: "Saint", email: "s@si.com", age: 27 },
   { id: "12dfh", name: "Merulin", email: "ds@si.com" }
 ];
-const posts = [
+let posts = [
   {
     id: "12fgh",
     title: "Sylvia",
@@ -37,7 +37,7 @@ const posts = [
     author: "12h"
   }
 ];
-const comments = [
+let comments = [
   { id: "jkk", text: "Boko", author: "12fgh", post: "12fgh" },
   { id: "jhjhkh", text: "Return to the basics", author: "12h", post: "ds" },
   {
@@ -64,6 +64,7 @@ type Query {
 
 type Mutation{
   createUser(data:CreateUserInput!):User!
+  deleteUser(id:ID!):User!
   createPost(data:CreatePostInput!):Post!
   createComment(data:CreateCommentInput!):Comment!
 }
@@ -175,7 +176,7 @@ const resolvers = {
       //create new user
       const user = {
         id: uuid4(),
-       ...args.data
+        ...args.data
       };
       //save new user
       users.push(user);
@@ -183,6 +184,33 @@ const resolvers = {
       return user;
     },
 
+    //TOVA E MALKO PO SLOGNO
+    deleteUser(parent, args, ctx, info) {
+      //find index of what we want to delete
+      const userIndex = users.findIndex(user => user.id === args.id);
+      if (userIndex === -1) {
+        throw new Error("Not such user");
+      }
+      const deletedUser = users.splice(userIndex, 1);
+
+      //tarsim v negovite postove
+      posts = posts.filter(currPost => {
+        //tarsim dali ima post chiito avtor e s args.id
+        const match = currPost.author === args.id;
+        //ako ima takav post
+        if (match) {
+          //filtrirame comentarite kato iztrivame vsicki komentari v tozi post
+          // vse edno dali negovi ili chugdi
+          comments = comments.filter(comment => comment.post !== currPost.id);
+        }
+        //vrashtame samo chugdite postove
+        return !match;
+      });
+      //iztrivame negovi komentai ot chugdi postove no bez da pipame postovete
+      comments=comments.filter((comment)=>comment.author!==args.id);
+
+      return deletedUser[0];
+    },
     createPost(parent, args, ctx, info) {
       const authorIdIsValid = users.some(user => {
         return user.id === args.data.author;
@@ -202,12 +230,13 @@ const resolvers = {
     },
 
     createComment(parent, args, ctx, info) {
-      const postIsValid = posts.some(post => post.id === args.data.post&&post.published);
+      const postIsValid = posts.some(
+        post => post.id === args.data.post && post.published
+      );
       if (!postIsValid) {
         throw new Error("Invalid post");
       }
 
-    
       const authorIdIsValid = users.some(user => user.id === args.data.author);
       if (!authorIdIsValid) {
         throw new Error("Author is not valid");
