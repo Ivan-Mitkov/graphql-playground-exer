@@ -202,7 +202,7 @@ const Mutation = {
     //publish for subscription with to arguments chanel name and actual data
     pubsub.publish(`comment ${args.data.post}`, { comment: {
       data:comment,
-      mutation:"CREATE"
+      mutation:"CREATED"
     } });
     return comment;
   },
@@ -223,7 +223,7 @@ const Mutation = {
   //publish for subscription with arguments chanel name and actual data
     pubsub.publish(`comment ${deletedComment[0].post}`, { comment: {
       data:deletedComment[0],
-      mutation:"DELETE"
+      mutation:"DELETED"
     } });
 
     return deletedComment[0];
