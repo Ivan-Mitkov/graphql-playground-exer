@@ -76,7 +76,7 @@ const Mutation = {
     return user;
   },
   createPost(parent, args, ctx, info) {
-    const{pubsub}=ctx;
+    const { pubsub } = ctx;
     const authorIdIsValid = ctx.db.users.some(user => {
       return user.id === args.data.author;
     });
@@ -90,24 +90,24 @@ const Mutation = {
     };
     //save
     ctx.db.posts.push(post);
-     //publish for subscription with to arguments chanel name and actual data
-     //use args for the new post
-     //change object to PostSubscriptionPayload
-     if(args.data.published){
-      pubsub.publish(`post`,{
-        post:{
-          data:post,
-          mutation:"CREATED"
+    //publish for subscription with to arguments chanel name and actual data
+    //use args for the new post
+    //change object to PostSubscriptionPayload
+    if (args.data.published) {
+      pubsub.publish(`post`, {
+        post: {
+          data: post,
+          mutation: "CREATED"
         }
-      })
-     }
-   
+      });
+    }
+
     //return
     return post;
   },
 
   deletePost(parent, args, ctx, info) {
-    const {pubsub}=ctx;
+    const { pubsub } = ctx;
     const postIndex = ctx.db.posts.findIndex(post => {
       return post.id === args.id;
     });
@@ -119,21 +119,24 @@ const Mutation = {
     ctx.db.comments = ctx.db.comments.filter(
       comment => comment.post !== args.id
     );
-      //publish
-    if(deletedPost[0].published){
-      pubsub.publish(`post`,{
-        post:{
-          mutation:"DELETED",
-          data:deletedPost[0]
+    //publish
+    if (deletedPost[0].published) {
+      pubsub.publish(`post`, {
+        post: {
+          mutation: "DELETED",
+          data: deletedPost[0]
         }
-      })
+      });
     }
     return deletedPost[0];
   },
   updatePost(parent, args, ctx, info) {
     const { id, data } = args;
-    const { db,pubsub } = ctx;
+    const { db, pubsub } = ctx;
+
     const post = db.posts.find(post => post.id === id);
+    const originalPost = { ...post };
+
     if (!post) {
       throw new Error("No such post");
     }
@@ -145,21 +148,38 @@ const Mutation = {
     }
     if (typeof data.published === "boolean") {
       post.published = data.published;
-    }
-    //subscription
-    if(post.published){
-      pubsub.publish('post',{
-        post:{
-          data:post,
-          mutation:"EDITED"
+
+      if (originalPost.published && !post.published) {
+        //deleted event
+        pubsub.publish("post", {
+          post: {
+            data: originalPost,
+            mutation: "DELETED"
+          }
+        });
+      } else if (!originalPost.published && post.published) {
+        //created event
+        pubsub.publish("post", {
+          post: {
+            data: post,
+            mutation: "CREATED"
+          }
+        });
+      }
+    } else if (post.published) {
+      //subscription update
+      pubsub.publish("post", {
+        post: {
+          data: post,
+          mutation: "EDITED"
         }
-      })
+      });
     }
     return post;
   },
 
   createComment(parent, args, ctx, info) {
-    const{pubsub}=ctx;
+    const { pubsub } = ctx;
     const postIsValid = ctx.db.posts.some(
       post => post.id === args.data.post && post.published
     );
@@ -180,33 +200,53 @@ const Mutation = {
     };
     ctx.db.comments.push(comment);
     //publish for subscription with to arguments chanel name and actual data
-    pubsub.publish(`comment ${args.data.post}`,{comment:comment})
+    pubsub.publish(`comment ${args.data.post}`, { comment: {
+      data:comment,
+      mutation:"CREATE"
+    } });
     return comment;
   },
 
   deleteComment(parent, args, ctx, info) {
+    const { pubsub } = ctx;
+
     const commentIndex = ctx.db.comments.findIndex(
       comment => comment.id === args.id
     );
+
     if (commentIndex === -1) {
       throw new Error("Comment not found");
     }
+
     const deletedComment = ctx.db.comments.splice(commentIndex, 1);
+
+  //publish for subscription with arguments chanel name and actual data
+    pubsub.publish(`comment ${deletedComment[0].post}`, { comment: {
+      data:deletedComment[0],
+      mutation:"DELETE"
+    } });
 
     return deletedComment[0];
   },
-  updateComment(parent,args,ctx,info){
-    const {id,data}=args;
-    const {db}=ctx;
-    const comment=db.comments.find((comment)=>comment.id===id);
-    if(!comment){
-      throw new Error('No such comment');
+  updateComment(parent, args, ctx, info) {
+    const { id, data } = args;
+    const { db,pubsub } = ctx;
+
+    const comment = db.comments.find(comment => comment.id === id);
+    if (!comment) {
+      throw new Error("No such comment");
     }
-    if(typeof data.text==='string'){
-      comment.text=data.text
+    if (typeof data.text === "string") {
+      comment.text = data.text;
     }
+
+    //publish for subscription with arguments chanel name and actual data
+    pubsub.publish(`comment ${comment.post}`, { comment: {
+      data:comment,
+      mutation:"UPDATED"
+    } });
+
     return comment;
-    
   }
 };
 
