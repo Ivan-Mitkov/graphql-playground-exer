@@ -76,6 +76,7 @@ const Mutation = {
     return user;
   },
   createPost(parent, args, ctx, info) {
+    const{pubsub}=ctx;
     const authorIdIsValid = ctx.db.users.some(user => {
       return user.id === args.data.author;
     });
@@ -89,11 +90,24 @@ const Mutation = {
     };
     //save
     ctx.db.posts.push(post);
+     //publish for subscription with to arguments chanel name and actual data
+     //use args for the new post
+     //change object to PostSubscriptionPayload
+     if(args.data.published){
+      pubsub.publish(`post`,{
+        post:{
+          data:post,
+          mutation:"CREATED"
+        }
+      })
+     }
+   
     //return
     return post;
   },
 
   deletePost(parent, args, ctx, info) {
+    const {pubsub}=ctx;
     const postIndex = ctx.db.posts.findIndex(post => {
       return post.id === args.id;
     });
@@ -105,11 +119,20 @@ const Mutation = {
     ctx.db.comments = ctx.db.comments.filter(
       comment => comment.post !== args.id
     );
+      //publish
+    if(deletedPost[0].published){
+      pubsub.publish(`post`,{
+        post:{
+          mutation:"DELETED",
+          data:deletedPost[0]
+        }
+      })
+    }
     return deletedPost[0];
   },
   updatePost(parent, args, ctx, info) {
     const { id, data } = args;
-    const { db } = ctx;
+    const { db,pubsub } = ctx;
     const post = db.posts.find(post => post.id === id);
     if (!post) {
       throw new Error("No such post");
@@ -123,10 +146,20 @@ const Mutation = {
     if (typeof data.published === "boolean") {
       post.published = data.published;
     }
+    //subscription
+    if(post.published){
+      pubsub.publish('post',{
+        post:{
+          data:post,
+          mutation:"EDITED"
+        }
+      })
+    }
     return post;
   },
 
   createComment(parent, args, ctx, info) {
+    const{pubsub}=ctx;
     const postIsValid = ctx.db.posts.some(
       post => post.id === args.data.post && post.published
     );
@@ -146,6 +179,8 @@ const Mutation = {
       ...args.data
     };
     ctx.db.comments.push(comment);
+    //publish for subscription with to arguments chanel name and actual data
+    pubsub.publish(`comment ${args.data.post}`,{comment:comment})
     return comment;
   },
 
